@@ -17,7 +17,7 @@ class Client(multiprocessing.Process):
         self._host = host
         self._port = port
         self._file = ''
-        self._rtt = rtt
+        self._time = rtt / 2
         self._p3 = p3
 
     def load_file(self, file):
@@ -40,7 +40,7 @@ class Client(multiprocessing.Process):
             resp = {}
             # 循环发送剩余部分
             while True:
-                self._client.settimeout(2 * self._rtt)
+                self._client.settimeout(2 * self._time)
                 try:
                     resp = json.loads(self._client.recv(64).decode())
                 except Exception as e:
@@ -62,7 +62,7 @@ class Client(multiprocessing.Process):
                 elif resp['status'] == '2':
                     logger.error(f'第 {count} 帧\t数据帧超时')
                     logger.info(f'第 {count} 帧\t重新发送')
-                time.sleep(self._rtt)
+                time.sleep(self._time)
                 if ch:
                     self._client.send(json.dumps({
                         'data': list(ch),

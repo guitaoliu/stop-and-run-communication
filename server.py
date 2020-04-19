@@ -17,7 +17,7 @@ class Server(multiprocessing.Process):
         self._host = host
         self._port = port
         self._file = ''
-        self._rtt = rtt
+        self._time = rtt / 2
         self._p1 = p1
         self._p2 = p2
         self._recv = {1: False}
@@ -54,7 +54,7 @@ class Server(multiprocessing.Process):
                         # 数据帧出错
                         elif random.random() < self._p1:
                             logger.error(f'第 {resp["num"]} 帧\t接收错误')
-                            time.sleep(self._rtt)
+                            time.sleep(self._time)
                             conn.send(json.dumps({
                                 'status': 0,
                             }).encode())
@@ -64,7 +64,7 @@ class Server(multiprocessing.Process):
                                 self._recv[resp['num'] + 1] = False
                                 logger.info(f'第 {resp["num"]} 帧\t接收成功')
                                 f.write(bytes(resp['data']))
-                                time.sleep(self._rtt)
+                                time.sleep(self._time)
                                 conn.send(json.dumps({
                                     'status': '1'
                                 }).encode())
