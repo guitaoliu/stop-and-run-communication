@@ -1,8 +1,9 @@
-import socket
-import random
-import time
+import json
 import logging
 import multiprocessing
+import random
+import socket
+import time
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -19,7 +20,7 @@ class Server(multiprocessing.Process):
         self._rtt = rtt
         self._p1 = p1
         self._p2 = p2
-        self._recv = {}
+        self._recv = {1: False}
 
     def save_file(self, file):
         self._file = file
@@ -30,44 +31,41 @@ class Server(multiprocessing.Process):
         self._server.listen(1)
         conn, addr = self._server.accept()
         logger.info('服务器启动完毕')
-        last_resp = ''
-        count = 0
         with open(self._file, 'wb+') as f:
             while True:
-                resp = conn.recv(64)
                 try:
-                    resp_decoded = resp.decode()
+                    resp = json.loads(conn.recv(1024).decode())
                 except:
-                    resp_decoded = '1'
+                    resp['status'] = '1'
 
-                if resp_decoded == '0':
+                if resp['status'] == '0':
                     f.close()
-                    logger.info(f'接收耗时{time.time()-start_time}秒')
+                    logger.info(f'接收耗时{time.time() - start_time}秒')
                     break
                 else:
-                    # 接收失败
-                    if random.random() < self._p2:
-                        continue
-                    # 数据帧出错
-                    elif random.random() < self._p1:
-                        count += 1
-                        self._recv[count] = False
-                        logger.error(f'第 {count} 帧\t接收错误')
-                        time.sleep(self._rtt)
-                        conn.send('0'.encode())
-                        count -= 1
+                    if self._recv[resp['num']]:
+                        conn.send(json.dumps({
+                            'status': '1'
+                        }).encode())
                     else:
-                        count += 1
-                        try:
-                            if not self._recv[count]:
-                                logger.info(f'第 {count} 帧\t接收成功')
-                                self._recv[count] = True
-                        except:
-                            self._recv[count] = True
-                            logger.info(f'第 {count} 帧\t接收成功')
-                        finally:
-                            f.write(resp)
-                        time.sleep(self._rtt)
-                        conn.send('1'.encode())
-                last_resp = resp
+                        # 接收失败
+                        if random.random() < self._p2:
+                            continue
+                        # 数据帧出错
+                        elif random.random() < self._p1:
+                            logger.error(f'第 {resp["num"]} 帧\t接收错误')
+                            time.sleep(self._rtt)
+                            conn.send(json.dumps({
+                                'status': 0,
+                            }).encode())
+                        else:
+                            if not self._recv[resp['num']]:
+                                self._recv[resp['num']] = True
+                                self._recv[resp['num'] + 1] = False
+                                logger.info(f'第 {resp["num"]} 帧\t接收成功')
+                                f.write(bytes(resp['data']))
+                                time.sleep(self._rtt)
+                                conn.send(json.dumps({
+                                    'status': '1'
+                                }).encode())
         conn.close()
